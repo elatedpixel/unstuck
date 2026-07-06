@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>UNSTUCK</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @font-face {
+    font-family: 'System';
+    src: local('SF Pro Display'), local('Helvetica Neue'), local('Arial');
+  }
+
+  body {
+    background: #000;
+    color: #fff;
+    font-family: 'System', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100dvh;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* ── Global canvas ── */
+  #scene {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  /* ── Breathing ring ── */
+  #ring-wrap {
+    position: relative;
+    width: 240px;
+    height: 240px;
+  }
+  .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.12);
+    transition: transform 4s cubic-bezier(.4,0,.2,1), border-color 1s, box-shadow 1s;
+  }
+  .ring.inhale {
+    transform: scale(1.35);
+    border-color: rgba(255,255,255,0.4);
+    box-shadow: 0 0 80px rgba(255,255,255,0.08), inset 0 0 60px rgba(255,255,255,0.03);
+  }
+  .ring.exhale {
+    transform: scale(0.85);
+    border-color: rgba(255,255,255,0.1);
+    box-shadow: none;
+  }
+  .ring:nth-child(2) { inset: 15px; transition-delay: 0.12s; }
+  .ring:nth-child(3) { inset: 30px; transition-delay: 0.24s; }
+
+  /* ── Breath cue text ── */
+  #breath-cue {
+    position: fixed;
+    bottom: 18%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 14px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.25);
+    transition: opacity 0.8s;
+    z-index: 2;
+  }
+
+  /* ── Prompt text ── */
+  #prompt {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: clamp(22px, 5vw, 38px);
+    font-weight: 300;
+    letter-spacing: 1px;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.8s;
+    z-index: 5;
+    padding: 20px;
+    line-height: 1.4;
+    pointer-events: none;
+  }
+  #prompt.visible { opacity: 1; }
+
+  /* ── Phase 2: Choice cards ── */
+  #choices {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 10;
+    padding: 30px;
+  }
+  #choices.active { display: flex; }
+
+  #choices-prompt {
+    font-size: clamp(16px, 3.5vw, 22px);
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 20px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .choice-row {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    max-width: 500px;
+    justify-content: center;
+  }
+
+  .choice-card {
+    width: 140px;
+    height: 140px;
+    border-radius: 16px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.3s;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .choice-card:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 40px rgba(255,255,255,0.1);
+  }
+  .choice-card:active {
+    transform: scale(0.95);
+  }
+  .choice-card canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Timer bar ── */
+  #timer-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.6), rgba(255,255,255,0.1));
+    z-index: 20;
+    transition: width linear;
+    width: 100%;
+  }
+
+  /* ── Phase 3: Simulation ── */
+  #simulation {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    cursor: pointer;
+  }
+  #simulation.active { display: flex; }
+  #sim-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Phase 4: Release ── */
+  #release {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    padding: 40px;
+  }
+  #release.active { display: flex; }
+
+  #action-text {
+    font-size: clamp(26px, 6vw, 48px);
+    font-weight: 200;
+    text-align: center;
+    line-height: 1.3;
+    margin-bottom: 60px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 1s, transform 1s;
+  }
+  #action-text.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  #launch-btn {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    background: transparent;
+    color: #fff;
+    font-size: 14px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.4s;
+    opacity: 0;
+    font-family: inherit;
+  }
+  #launch-btn.visible {
+    opacity: 1;
+  }
+  #launch-btn:hover {
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 0 60px rgba(255,255,255,0.15);
+    transform: scale(1.08);
+  }
+  #launch-btn:active {
+    transform: scale(0.92);
+    background: rgba(255,255,255,0.2);
+  }
+
+  /* ── Countdown overlay ── */
+  #countdown {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    background: #000;
+    font-size: clamp(80px, 20vw, 200px);
+    font-weight: 100;
+    color: #fff;
+  }
+  #countdown.active { display: flex; }
+
+  /* ── Background pulse ── */
+  #bg-pulse {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 70%);
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 2s;
+  }
+
+  /* ── Particle field ── */
+  #particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* ── Tap to begin ── */
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    background: #000;
+    cursor: pointer;
+  }
+  #start-screen h1 {
+    font-size: clamp(36px, 8vw, 64px);
+    font-weight: 200;
+    letter-spacing: 12px;
+    margin-bottom: 40px;
+    text-transform: uppercase;
+  }
+  #start-screen p {
+    font-size: 13px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    animation: pulse-text 2s ease-in-out infinite;
+  }
+  @keyframes pulse-text {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+  }
+
+  /* ── Screen flash ── */
+  #flash {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+  }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>Unstuck</h1>
+  <p>Tap to begin</p>
+</div>
+
+<div id="flash"></div>
+<canvas id="particles"></canvas>
+<div id="bg-pulse"></div>
+
+<div id="scene">
+  <div id="ring-wrap">
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="ring"></div>
+  </div>
+</div>
+
+<div id="breath-cue"></div>
+<div id="prompt"></div>
+<div id="timer-bar" style="display:none"></div>
+
+<div id="choices">
+  <div id="choices-prompt"></div>
+  <div class="choice-row" id="choice-row-1"></div>
+  <div class="choice-row" id="choice-row-2"></div>
+</div>
+
+<div id="simulation">
+  <canvas id="sim-canvas"></canvas>
+</div>
+
+<div id="release">
+  <div id="action-text"></div>
+  <button id="launch-btn">GO</button>
+</div>
+
+<div id="countdown"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// AUDIO ENGINE
+// ═══════════════════════════════════════════
+let audioCtx;
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playDrone(freq = 55, duration = 16) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  filter.type = 'lowpass';
+  filter.frequency.value = 120;
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 3);
+  gain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + duration - 3);
+  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+  osc.connect(filter).connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+  return { osc, gain };
+}
+
+function playTick() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 800;
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playImpact() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.5);
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.5);
+}
+
+function playRise() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 1.5);
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.8);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.8);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 2);
+}
+
+function playRelease() {
+  [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = audioCtx.currentTime + i * 0.2;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.08, t + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 1.5);
+  });
+}
+
+function playCountdownBeep(final = false) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = final ? 880 : 440;
+  gain.gain.setValueAtTime(final ? 0.25 : 0.12, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (final ? 0.6 : 0.3));
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + (final ? 0.6 : 0.3));
+}
+
+// ═══════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════
+const pCanvas = document.getElementById('particles');
+const pCtx = pCanvas.getContext('2d');
+let particles = [];
+
+function resizeParticles() {
+  pCanvas.width = window.innerWidth;
+  pCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeParticles);
+resizeParticles();
+
+function spawnParticles(n = 60) {
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: Math.random() * pCanvas.width,
+      y: Math.random() * pCanvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.5,
+      a: Math.random() * 0.15 + 0.03
+    });
+  }
+}
+
+let particleSpeed = 1;
+function animateParticles() {
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles.forEach(p => {
+    p.x += p.vx * particleSpeed;
+    p.y += p.vy * particleSpeed;
+    if (p.x < 0) p.x = pCanvas.width;
+    if (p.x > pCanvas.width) p.x = 0;
+    if (p.y < 0) p.y = pCanvas.height;
+    if (p.y > pCanvas.height) p.y = 0;
+    pCtx.beginPath();
+    pCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    pCtx.fillStyle = `rgba(255,255,255,${p.a})`;
+    pCtx.fill();
+  });
+  requestAnimationFrame(animateParticles);
+}
+spawnParticles();
+animateParticles();
+
+// ═══════════════════════════════════════════
+// ABSTRACT VISUAL GENERATORS (for choice cards)
+// ═══════════════════════════════════════════
+const visualGenerators = {
+  // Tangled knot — feeling of confusion/complexity
+  knot(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 30%, 8%)`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = `hsla(${hue}, 60%, 50%, 0.4)`;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 12; i++) {
+      ctx.beginPath();
+      let x = w / 2, y = h / 2;
+      ctx.moveTo(x, y);
+      for (let j = 0; j < 30; j++) {
+        x += Math.sin(j * 0.8 + i) * 12;
+        y += Math.cos(j * 0.6 + i * 1.3) * 12;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  },
+
+  // Heavy weight — feeling of burden
+  weight(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 20%, 6%)`;
+    ctx.fillRect(0, 0, w, h);
+    const grd = ctx.createRadialGradient(w/2, h*0.7, 5, w/2, h*0.7, w*0.4);
+    grd.addColorStop(0, `hsla(${hue}, 40%, 30%, 0.6)`);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = `hsla(${hue}, 30%, 20%, 0.8)`;
+    ctx.beginPath();
+    ctx.arc(w/2, h*0.7, w*0.25, 0, Math.PI*2);
+    ctx.fill();
+  },
+
+  // Scattered fragments — feeling of overwhelm
+  scatter(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 25%, 7%)`;
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 30; i++) {
+      ctx.save();
+      ctx.translate(Math.random() * w, Math.random() * h);
+      ctx.rotate(Math.random() * Math.PI);
+      ctx.fillStyle = `hsla(${hue}, 50%, 45%, ${Math.random() * 0.4 + 0.1})`;
+      ctx.fillRect(-8, -3, 16, 6);
+      ctx.restore();
+    }
+  },
+
+  // Void/empty — feeling of emptiness/apathy
+  void(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 15%, 4%)`;
+    ctx.fillRect(0, 0, w, h);
+    const grd = ctx.createRadialGradient(w/2, h/2, w*0.05, w/2, h/2, w*0.35);
+    grd.addColorStop(0, `hsla(${hue}, 30%, 3%, 1)`);
+    grd.addColorStop(0.5, `hsla(${hue}, 40%, 12%, 0.3)`);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+  },
+
+  // Wall — feeling of being blocked
+  wall(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 20%, 8%)`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = `hsla(${hue}, 30%, 35%, 0.5)`;
+    ctx.lineWidth = 3;
+    for (let y = h*0.2; y < h*0.8; y += 12) {
+      ctx.beginPath();
+      ctx.moveTo(w*0.15, y);
+      ctx.lineTo(w*0.85, y);
+      ctx.stroke();
+    }
+  },
+
+  // Spiral — feeling of spinning/anxiety
+  spiral(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 25%, 6%)`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = `hsla(${hue}, 60%, 45%, 0.35)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 8; a += 0.05) {
+      const r = a * 5;
+      const x = w/2 + Math.cos(a) * r;
+      const y = h/2 + Math.sin(a) * r;
+      a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  },
+
+  // Cage — feeling of being trapped
+  cage(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 20%, 5%)`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = `hsla(${hue}, 30%, 40%, 0.4)`;
+    ctx.lineWidth = 2;
+    for (let x = w*0.2; x <= w*0.8; x += 12) {
+      ctx.beginPath();
+      ctx.moveTo(x, h*0.1);
+      ctx.lineTo(x, h*0.9);
+      ctx.stroke();
+    }
+  },
+
+  // Fog — feeling of confusion/unclear
+  fog(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 15%, 7%)`;
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 8; i++) {
+      const grd = ctx.createRadialGradient(
+        Math.random()*w, Math.random()*h, 0,
+        Math.random()*w, Math.random()*h, w*0.4
+      );
+      grd.addColorStop(0, `hsla(${hue}, 20%, 25%, 0.12)`);
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+};
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let userChoices = [];
+const $ = id => document.getElementById(id);
+
+// ═══════════════════════════════════════════
+// PHASE 1: BREATHE (Primal)
+// ═══════════════════════════════════════════
+async function phase1() {
+  const scene = $('scene');
+  const cue = $('breath-cue');
+  const bgPulse = $('bg-pulse');
+  const rings = document.querySelectorAll('.ring');
+
+  scene.style.display = 'flex';
+  bgPulse.style.opacity = '1';
+
+  playDrone(55, 20);
+  // Second drone for richness
+  setTimeout(() => playDrone(82.5, 18), 1000);
+
+  // 4 breath cycles
+  const cycles = 4;
+  for (let i = 0; i < cycles; i++) {
+    // Inhale
+    cue.textContent = 'Breathe in';
+    cue.style.opacity = '1';
+    rings.forEach(r => { r.classList.remove('exhale'); r.classList.add('inhale'); });
+
+    await sleep(4000);
+
+    // Exhale
+    cue.textContent = 'Let go';
+    rings.forEach(r => { r.classList.remove('inhale'); r.classList.add('exhale'); });
+
+    await sleep(4000);
+  }
+
+  // Fade out breathing
+  cue.style.opacity = '0';
+  rings.forEach(r => { r.classList.remove('inhale', 'exhale'); });
+
+  await sleep(800);
+  scene.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════
+// PHASE 2: CONFRONT (Instinct)
+// ═══════════════════════════════════════════
+const choiceQuestions = [
+  {
+    prompt: "Which feels like your stuck?",
+    options: [
+      { gen: 'knot', hue: 0, label: 'tangled' },
+      { gen: 'weight', hue: 240, label: 'heavy' },
+      { gen: 'scatter', hue: 40, label: 'scattered' },
+      { gen: 'void', hue: 270, label: 'empty' }
+    ]
+  },
+  {
+    prompt: "Where does it live?",
+    options: [
+      { gen: 'wall', hue: 200, label: 'blocked' },
+      { gen: 'spiral', hue: 320, label: 'spinning' },
+      { gen: 'cage', hue: 160, label: 'trapped' },
+      { gen: 'fog', hue: 50, label: 'lost' }
+    ]
+  },
+  {
+    prompt: "What's on the other side?",
+    options: [
+      { gen: 'burst', hue: 45, label: 'power' },
+      { gen: 'flow', hue: 180, label: 'peace' },
+      { gen: 'sharp', hue: 0, label: 'clarity' },
+      { gen: 'warm', hue: 30, label: 'relief' }
+    ]
+  }
+];
+
+// Positive visuals for Q3
+const positiveGenerators = {
+  burst(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 40%, 8%)`;
+    ctx.fillRect(0, 0, w, h);
+    const cx = w/2, cy = h/2;
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2;
+      const len = w * 0.35;
+      ctx.strokeStyle = `hsla(${hue}, 70%, 55%, ${0.2 + i*0.03})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len);
+      ctx.stroke();
+    }
+  },
+  flow(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 30%, 6%)`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = `hsla(${hue}, 60%, 45%, 0.3)`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.3 + i * 10);
+      for (let x = 0; x < w; x += 5) {
+        ctx.lineTo(x, h * 0.3 + i * 10 + Math.sin(x * 0.02 + i) * 20);
+      }
+      ctx.stroke();
+    }
+  },
+  sharp(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 20%, 5%)`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = `hsla(0, 0%, 80%, 0.5)`;
+    ctx.lineWidth = 1;
+    // Clean grid
+    for (let x = w*0.2; x <= w*0.8; x += 20) {
+      ctx.beginPath(); ctx.moveTo(x, h*0.2); ctx.lineTo(x, h*0.8); ctx.stroke();
+    }
+    for (let y = h*0.2; y <= h*0.8; y += 20) {
+      ctx.beginPath(); ctx.moveTo(w*0.2, y); ctx.lineTo(w*0.8, y); ctx.stroke();
+    }
+  },
+  warm(ctx, w, h, hue) {
+    ctx.fillStyle = `hsl(${hue}, 30%, 8%)`;
+    ctx.fillRect(0, 0, w, h);
+    const grd = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w*0.45);
+    grd.addColorStop(0, `hsla(${hue}, 60%, 50%, 0.3)`);
+    grd.addColorStop(0.6, `hsla(${hue}, 50%, 30%, 0.15)`);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+  }
+};
+
+async function phase2() {
+  const choices = $('choices');
+  const timerBar = $('timer-bar');
+  timerBar.style.display = 'block';
+
+  for (let q = 0; q < choiceQuestions.length; q++) {
+    const question = choiceQuestions[q];
+    const promptEl = $('choices-prompt');
+    const row1 = $('choice-row-1');
+    const row2 = $('choice-row-2');
+
+    row1.innerHTML = '';
+    row2.innerHTML = '';
+    promptEl.textContent = question.prompt;
+
+    // Build cards
+    question.options.forEach((opt, i) => {
+      const card = document.createElement('div');
+      card.className = 'choice-card';
+      const cvs = document.createElement('canvas');
+      cvs.width = 280; cvs.height = 280;
+      const ctx = cvs.getContext('2d');
+
+      // Use appropriate generator
+      const gen = visualGenerators[opt.gen] || positiveGenerators[opt.gen];
+      if (gen) gen(ctx, 280, 280, opt.hue);
+
+      card.appendChild(cvs);
+      card.dataset.label = opt.label;
+      card.dataset.gen = opt.gen;
+
+      if (i < 2) row1.appendChild(card);
+      else row2.appendChild(card);
+    });
+
+    choices.classList.add('active');
+
+    // Timer
+    const timeLimit = q === 0 ? 6000 : 4000;
+    timerBar.style.transition = 'none';
+    timerBar.style.width = '100%';
+    requestAnimationFrame(() => {
+      timerBar.style.transition = `width ${timeLimit}ms linear`;
+      timerBar.style.width = '0%';
+    });
+
+    // Wait for choice or timeout
+    const chosenLabel = await Promise.race([
+      new Promise(resolve => {
+        choices.querySelectorAll('.choice-card').forEach(card => {
+          card.addEventListener('click', () => {
+            playTick();
+            card.style.boxShadow = '0 0 40px rgba(255,255,255,0.3)';
+            card.style.border = '1px solid rgba(255,255,255,0.4)';
+            resolve(card.dataset.label);
+          }, { once: true });
+        });
+      }),
+      sleep(timeLimit).then(() => {
+        // Auto-select first if no choice
+        const firstCard = row1.querySelector('.choice-card');
+        return firstCard ? firstCard.dataset.label : 'none';
+      })
+    ]);
+
+    userChoices.push(chosenLabel);
+    choices.classList.remove('active');
+    await sleep(400);
+  }
+
+  timerBar.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════
+// PHASE 3: SIMULATE (Embodied imagination)
+// ═══════════════════════════════════════════
+async function phase3() {
+  const sim = $('simulation');
+  const canvas = $('sim-canvas');
+  const ctx = canvas.getContext('2d');
+  const prompt = $('prompt');
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  sim.classList.add('active');
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // The "obstacle" based on user's first choice
+  const stuckType = userChoices[0] || 'tangled';
+  const desiredState = userChoices[2] || 'power';
+
+  // Show prompt
+  prompt.textContent = 'Tap to break through';
+  prompt.classList.add('visible');
+
+  let tapCount = 0;
+  const tapsNeeded = 6;
+  let animFrame;
+  let crackProgress = 0;
+  let broken = false;
+
+  // Draw obstacle
+  function drawObstacle() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Dark barrier
+    const barrierAlpha = Math.max(0, 1 - crackProgress);
+    ctx.fillStyle = `rgba(20, 20, 25, ${barrierAlpha})`;
+    ctx.fillRect(0, 0, W, H);
+
+    // Cracks
+    if (crackProgress > 0 && !broken) {
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.3 + crackProgress * 0.4})`;
+      ctx.lineWidth = 1 + crackProgress * 2;
+      const numCracks = Math.floor(crackProgress * 15);
+      for (let i = 0; i < numCracks; i++) {
+        ctx.beginPath();
+        let x = W/2, y = H/2;
+        ctx.moveTo(x, y);
+        const angle = (i / numCracks) * Math.PI * 2 + Math.sin(i) * 0.5;
+        for (let j = 0; j < 8; j++) {
+          x += Math.cos(angle + (Math.random()-0.5)*0.8) * (20 + crackProgress * 15);
+          y += Math.sin(angle + (Math.random()-0.5)*0.8) * (20 + crackProgress * 15);
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // Light bleeding through cracks
+      const lightGrd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, crackProgress * W * 0.4);
+      const hue = desiredState === 'peace' ? 180 : desiredState === 'clarity' ? 220 : desiredState === 'relief' ? 30 : 45;
+      lightGrd.addColorStop(0, `hsla(${hue}, 60%, 60%, ${crackProgress * 0.3})`);
+      lightGrd.addColorStop(1, 'transparent');
+      ctx.fillStyle = lightGrd;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Broken through — the other side
+    if (broken) {
+      const hue = desiredState === 'peace' ? 180 : desiredState === 'clarity' ? 220 : desiredState === 'relief' ? 30 : 45;
+      const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.6);
+      grd.addColorStop(0, `hsla(${hue}, 50%, 55%, ${Math.min(0.25, crackProgress * 0.1)})`);
+      grd.addColorStop(0.5, `hsla(${hue}, 40%, 20%, ${Math.min(0.15, crackProgress * 0.05)})`);
+      grd.addColorStop(1, `hsla(${hue}, 30%, 5%, 1)`);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+
+      // Floating particles of light
+      for (let i = 0; i < 30; i++) {
+        const px = W/2 + Math.sin(Date.now()*0.001 + i*2) * W * 0.3;
+        const py = H/2 + Math.cos(Date.now()*0.0008 + i*1.5) * H * 0.3;
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI*2);
+        ctx.fillStyle = `hsla(${hue}, 60%, 60%, ${0.1 + Math.sin(Date.now()*0.002+i)*0.1})`;
+        ctx.fill();
+      }
+    }
+
+    animFrame = requestAnimationFrame(drawObstacle);
+  }
+  drawObstacle();
+
+  // Tap handler
+  const onTap = () => {
+    if (broken) return;
+    tapCount++;
+    playImpact();
+
+    // Screen shake
+    document.body.style.transform = `translate(${(Math.random()-0.5)*8}px, ${(Math.random()-0.5)*8}px)`;
+    setTimeout(() => document.body.style.transform = '', 100);
+
+    crackProgress = tapCount / tapsNeeded;
+    particleSpeed = 1 + crackProgress * 4;
+
+    if (tapCount >= tapsNeeded) {
+      broken = true;
+      prompt.classList.remove('visible');
+
+      // Flash
+      const flash = $('flash');
+      flash.style.opacity = '0.7';
+      setTimeout(() => flash.style.opacity = '0', 200);
+
+      playRise();
+      particleSpeed = 8;
+      setTimeout(() => { particleSpeed = 1; }, 2000);
+
+      setTimeout(() => {
+        cancelAnimationFrame(animFrame);
+        sim.classList.remove('active');
+        sim.removeEventListener('click', onTap);
+        phase4();
+      }, 2500);
+    }
+  };
+  sim.addEventListener('click', onTap);
+
+  // Don't await — phase ends via tap progression
+}
+
+// ═══════════════════════════════════════════
+// PHASE 4: RELEASE
+// ═══════════════════════════════════════════
+async function phase4() {
+  const release = $('release');
+  const actionText = $('action-text');
+  const launchBtn = $('launch-btn');
+
+  release.classList.add('active');
+
+  // Generate action text based on choices
+  const stuckType = userChoices[0] || 'tangled';
+  const actions = {
+    tangled: "Pick one thread.\nJust one.\nPull it.",
+    heavy: "Set it down.\nPick up only\nthe next piece.",
+    scattered: "One thing.\nThe smallest thing.\nRight now.",
+    empty: "You don't need to feel it\nto move.\nMove first."
+  };
+
+  actionText.innerHTML = (actions[stuckType] || actions.tangled).replace(/\n/g, '<br>');
+  await sleep(500);
+  actionText.classList.add('visible');
+
+  playRelease();
+
+  await sleep(1500);
+  launchBtn.classList.add('visible');
+
+  launchBtn.addEventListener('click', async () => {
+    launchBtn.style.display = 'none';
+    actionText.classList.remove('visible');
+    release.classList.remove('active');
+
+    // Countdown
+    const cd = $('countdown');
+    cd.classList.add('active');
+
+    for (let i = 3; i >= 1; i--) {
+      cd.textContent = i;
+      playCountdownBeep(i === 1);
+      cd.style.transform = 'scale(1.3)';
+      cd.style.opacity = '1';
+      await sleep(200);
+      cd.style.transform = 'scale(1)';
+      await sleep(800);
+    }
+
+    // Final
+    const flash = $('flash');
+    flash.style.opacity = '1';
+    cd.textContent = 'GO';
+    cd.style.fontSize = 'clamp(100px, 25vw, 250px)';
+
+    await sleep(600);
+    flash.style.transition = 'opacity 1.5s';
+    flash.style.opacity = '0';
+
+    await sleep(1500);
+    cd.textContent = "You're already moving.";
+    cd.style.fontSize = 'clamp(18px, 4vw, 28px)';
+    cd.style.fontWeight = '300';
+    cd.style.letterSpacing = '4px';
+    cd.style.opacity = '0.5';
+
+    await sleep(3000);
+    cd.classList.remove('active');
+  }, { once: true });
+}
+
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════
+$('start-screen').addEventListener('click', async () => {
+  initAudio();
+  $('start-screen').style.transition = 'opacity 1s';
+  $('start-screen').style.opacity = '0';
+  await sleep(1000);
+  $('start-screen').style.display = 'none';
+
+  await phase1();
+  await phase2();
+  phase3(); // Phase 3 resolves via interaction, triggers phase 4
+}, { once: true });
+</script>
+</body>
+</html>
