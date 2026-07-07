@@ -149,6 +149,10 @@
     width: 100%;
     height: 100%;
   }
+  @keyframes card-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); box-shadow: 0 0 25px rgba(255,255,255,0.12); }
+  }
 
   /* ── Timer bar ── */
   #timer-bar {
@@ -160,6 +164,25 @@
     z-index: 20;
     transition: width linear;
     width: 100%;
+  }
+
+  /* ── Urgency vignette ── */
+  #urgency-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(255,60,30,0.0) 60%, rgba(255,30,10,0.25) 100%);
+  }
+  #urgency-vignette.active {
+    opacity: 1;
+    animation: vignette-pulse 0.6s ease-in-out infinite;
+  }
+  @keyframes vignette-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
   }
 
   /* ── Phase 3: Simulation ── */
@@ -331,6 +354,7 @@
 <div id="breath-cue"></div>
 <div id="prompt"></div>
 <div id="timer-bar" style="display:none"></div>
+<div id="urgency-vignette"></div>
 
 <div id="choices">
   <div id="choices-prompt"></div>
@@ -441,6 +465,52 @@ function playCountdownBeep(final = false) {
   osc.connect(gain).connect(audioCtx.destination);
   osc.start();
   osc.stop(audioCtx.currentTime + (final ? 0.6 : 0.3));
+}
+
+// Accelerating tick sequence for choice urgency
+function startUrgencyTicks(durationMs, onComplete) {
+  const startTime = Date.now();
+  let tickHandle;
+  const vignette = $('urgency-vignette');
+
+  function scheduleTick() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / durationMs, 1);
+
+    if (progress >= 1) {
+      vignette.classList.remove('active');
+      return;
+    }
+
+    // Tick sound — pitch rises, volume rises with progress
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 300 + progress * 600;
+    const vol = 0.03 + progress * 0.12;
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.06);
+
+    // Activate vignette in final 40%
+    if (progress > 0.6) {
+      vignette.classList.add('active');
+    }
+
+    // Interval decreases: starts at 500ms, ends at 100ms
+    const interval = 500 - progress * 400;
+    tickHandle = setTimeout(scheduleTick, interval);
+  }
+
+  // Start after a brief grace period (30% of time is silent)
+  tickHandle = setTimeout(scheduleTick, durationMs * 0.3);
+
+  return () => {
+    clearTimeout(tickHandle);
+    vignette.classList.remove('active');
+  };
 }
 
 // ═══════════════════════════════════════════
@@ -788,14 +858,30 @@ async function phase2() {
 
     choices.classList.add('active');
 
-    // Timer
-    const timeLimit = q === 0 ? 6000 : 4000;
+    // Timer + urgency cues
+    const timeLimit = q === 0 ? 7000 : 5000;
+    const stopTicks = startUrgencyTicks(timeLimit);
     timerBar.style.transition = 'none';
     timerBar.style.width = '100%';
     requestAnimationFrame(() => {
       timerBar.style.transition = `width ${timeLimit}ms linear`;
       timerBar.style.width = '0%';
     });
+
+    // Pulse cards with increasing intensity
+    const allCards = choices.querySelectorAll('.choice-card');
+    let pulseInterval = setInterval(() => {
+      const elapsed = Date.now() - choiceStart;
+      const progress = Math.min(elapsed / timeLimit, 1);
+      const glow = progress > 0.5 ? (progress - 0.5) * 0.4 : 0;
+      allCards.forEach(c => {
+        c.style.borderColor = `rgba(255,255,255,${0.06 + glow})`;
+        if (progress > 0.7) {
+          c.style.animation = `card-pulse ${0.8 - progress * 0.4}s ease-in-out infinite`;
+        }
+      });
+    }, 100);
+    const choiceStart = Date.now();
 
     // Wait for choice or timeout
     const chosenLabel = await Promise.race([
@@ -817,6 +903,9 @@ async function phase2() {
     ]);
 
     userChoices.push(chosenLabel);
+    stopTicks();
+    clearInterval(pulseInterval);
+    allCards.forEach(c => { c.style.animation = ''; c.style.borderColor = ''; });
     choices.classList.remove('active');
     await sleep(q < choiceQuestions.length - 1 ? 300 : 0);
   }
