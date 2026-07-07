@@ -818,7 +818,7 @@ async function phase2() {
 
     userChoices.push(chosenLabel);
     choices.classList.remove('active');
-    await sleep(400);
+    await sleep(q < choiceQuestions.length - 1 ? 300 : 0);
   }
 
   timerBar.style.display = 'none';
@@ -843,10 +843,6 @@ async function phase3() {
   // The "obstacle" based on user's first choice
   const stuckType = userChoices[0] || 'tangled';
   const desiredState = userChoices[2] || 'power';
-
-  // Show prompt
-  prompt.textContent = 'Tap to break through';
-  prompt.classList.add('visible');
 
   let tapCount = 0;
   const tapsNeeded = 6;
