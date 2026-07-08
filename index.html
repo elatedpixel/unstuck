@@ -920,7 +920,6 @@ async function phase3() {
   const sim = $('simulation');
   const canvas = $('sim-canvas');
   const ctx = canvas.getContext('2d');
-  const prompt = $('prompt');
 
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -947,6 +946,16 @@ async function phase3() {
     const barrierAlpha = Math.max(0, 1 - crackProgress);
     ctx.fillStyle = `rgba(20, 20, 25, ${barrierAlpha})`;
     ctx.fillRect(0, 0, W, H);
+
+    // Subtle center pulse before any taps to signal interactivity
+    if (tapCount === 0) {
+      const pulse = 0.04 + Math.sin(Date.now() * 0.003) * 0.03;
+      const pulseGrd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.25);
+      pulseGrd.addColorStop(0, `rgba(255, 255, 255, ${pulse})`);
+      pulseGrd.addColorStop(1, 'transparent');
+      ctx.fillStyle = pulseGrd;
+      ctx.fillRect(0, 0, W, H);
+    }
 
     // Cracks
     if (crackProgress > 0 && !broken) {
@@ -1000,11 +1009,24 @@ async function phase3() {
   }
   drawObstacle();
 
+  // Show tap prompt after a beat
+  const prompt = $('prompt');
+  prompt.textContent = stuckType === 'heavy' ? 'Hit it.' :
+                        stuckType === 'scattered' ? 'Smash through.' :
+                        stuckType === 'empty' ? 'Strike.' : 'Break it.';
+  await sleep(600);
+  prompt.classList.add('visible');
+
   // Tap handler
   const onTap = () => {
     if (broken) return;
     tapCount++;
     playImpact();
+
+    // Fade prompt after first tap
+    if (tapCount === 1) {
+      prompt.classList.remove('visible');
+    }
 
     // Screen shake
     document.body.style.transform = `translate(${(Math.random()-0.5)*8}px, ${(Math.random()-0.5)*8}px)`;
