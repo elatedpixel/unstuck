@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BREATHE — Wim Hof</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @font-face {
+    font-family: 'System';
+    src: local('SF Pro Display'), local('Helvetica Neue'), local('Arial');
+  }
+
+  body {
+    background: #000;
+    color: #fff;
+    font-family: 'System', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100dvh;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  /* ── Particle field ── */
+  #particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* ── Background pulse ── */
+  #bg-pulse {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 70%);
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 2s;
+  }
+
+  /* ── Breathing rings ── */
+  #scene {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  #ring-wrap {
+    position: relative;
+    width: 240px;
+    height: 240px;
+  }
+  .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.12);
+    transition: transform 2s cubic-bezier(.4,0,.2,1), border-color 0.8s, box-shadow 0.8s;
+  }
+  .ring.inhale {
+    transform: scale(1.35);
+    border-color: rgba(255,255,255,0.4);
+    box-shadow: 0 0 80px rgba(255,255,255,0.08), inset 0 0 60px rgba(255,255,255,0.03);
+  }
+  .ring.exhale {
+    transform: scale(0.85);
+    border-color: rgba(255,255,255,0.1);
+    box-shadow: none;
+  }
+  .ring.hold {
+    border-color: rgba(255,255,255,0.25);
+    box-shadow: 0 0 60px rgba(255,255,255,0.05), inset 0 0 40px rgba(255,255,255,0.02);
+  }
+  .ring.bloom {
+    transform: scale(1.5);
+    border-color: rgba(255,200,100,0.5);
+    box-shadow: 0 0 120px rgba(255,180,60,0.15), inset 0 0 80px rgba(255,200,100,0.05);
+  }
+  .ring.bloom-hold {
+    transform: scale(1.45);
+    border-color: rgba(255,200,100,0.4);
+    box-shadow: 0 0 100px rgba(255,180,60,0.12), inset 0 0 60px rgba(255,200,100,0.04);
+  }
+  .ring:nth-child(2) { inset: 15px; transition-delay: 0.08s; }
+  .ring:nth-child(3) { inset: 30px; transition-delay: 0.16s; }
+
+  /* ── Breath counter ── */
+  #breath-counter {
+    position: fixed;
+    top: 15%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: clamp(48px, 12vw, 96px);
+    font-weight: 100;
+    color: rgba(255,255,255,0.15);
+    z-index: 2;
+    transition: opacity 0.5s, color 1s;
+    pointer-events: none;
+  }
+
+  /* ── Breath cue text ── */
+  #breath-cue {
+    position: fixed;
+    bottom: 18%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 14px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.25);
+    transition: opacity 0.8s;
+    z-index: 2;
+  }
+
+  /* ── Hold timer ── */
+  #hold-timer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(56px, 14vw, 120px);
+    font-weight: 100;
+    color: rgba(255,255,255,0.2);
+    z-index: 3;
+    opacity: 0;
+    transition: opacity 0.8s, color 1s;
+    pointer-events: none;
+  }
+
+  /* ── Prompt text ── */
+  #prompt {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: clamp(22px, 5vw, 38px);
+    font-weight: 300;
+    letter-spacing: 1px;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.8s;
+    z-index: 5;
+    padding: 20px;
+    line-height: 1.4;
+    pointer-events: none;
+  }
+  #prompt.visible { opacity: 1; }
+
+  /* ── Round indicator ── */
+  #round-indicator {
+    position: fixed;
+    top: 6%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.15);
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.8s;
+  }
+
+  /* ── Tap zone for hold phase ── */
+  #tap-zone {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    cursor: pointer;
+    display: none;
+  }
+
+  /* ── Start screen ── */
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    background: #000;
+    cursor: pointer;
+  }
+  #start-screen h1 {
+    font-size: clamp(36px, 8vw, 64px);
+    font-weight: 200;
+    letter-spacing: 12px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  #start-screen .subtitle {
+    font-size: clamp(11px, 2.5vw, 14px);
+    font-weight: 300;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+    margin-bottom: 50px;
+  }
+  #start-screen p {
+    font-size: 13px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    animation: pulse-text 2s ease-in-out infinite;
+  }
+  @keyframes pulse-text {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+  }
+
+  /* ── Screen flash ── */
+  #flash {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+  }
+
+  /* ── Completion screen ── */
+  #complete {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    background: #000;
+    padding: 40px;
+  }
+  #complete.active { display: flex; }
+  #complete h2 {
+    font-size: clamp(28px, 6vw, 48px);
+    font-weight: 200;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+    opacity: 0;
+    transition: opacity 1.5s;
+  }
+  #complete .stats {
+    font-size: clamp(12px, 2.5vw, 16px);
+    font-weight: 300;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    line-height: 2;
+    opacity: 0;
+    transition: opacity 1.5s;
+  }
+
+  /* ── Heartbeat pulse ring ── */
+  #heartbeat {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0);
+    z-index: 1;
+    pointer-events: none;
+    transition: border-color 0.1s;
+  }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>Breathe</h1>
+  <div class="subtitle">Wim Hof Method</div>
+  <p>Tap to begin</p>
+</div>
+
+<div id="flash"></div>
+<canvas id="particles"></canvas>
+<div id="bg-pulse"></div>
+<div id="heartbeat"></div>
+
+<div id="scene">
+  <div id="ring-wrap">
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="ring"></div>
+  </div>
+</div>
+
+<div id="round-indicator"></div>
+<div id="breath-counter"></div>
+<div id="breath-cue"></div>
+<div id="hold-timer"></div>
+<div id="prompt"></div>
+<div id="tap-zone"></div>
+
+<div id="complete">
+  <h2>Complete</h2>
+  <div class="stats"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// AUDIO ENGINE
+// ═══════════════════════════════════════════
+let audioCtx;
+let activeDrones = [];
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playDrone(freq = 55, duration = 16, gain = 0.15) {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  filter.type = 'lowpass';
+  filter.frequency.value = 120;
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(gain, audioCtx.currentTime + 3);
+  g.gain.linearRampToValueAtTime(gain, audioCtx.currentTime + duration - 3);
+  g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+  osc.connect(filter).connect(g).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+  activeDrones.push({ osc, gain: g });
+  return { osc, gain: g };
+}
+
+// Breath pulse sound — rhythmic whoosh
+function playBreathPulse(inhale = true) {
+  const osc = audioCtx.createOscillator();
+  const noise = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  
+  osc.type = 'sine';
+  filter.type = 'lowpass';
+  
+  if (inhale) {
+    osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(160, audioCtx.currentTime + 1.2);
+    filter.frequency.setValueAtTime(200, audioCtx.currentTime);
+    filter.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 1.2);
+    g.gain.setValueAtTime(0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.3);
+    g.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 1.0);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.4);
+  } else {
+    osc.frequency.setValueAtTime(140, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.8);
+    filter.frequency.setValueAtTime(300, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.8);
+    g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.9);
+  }
+  
+  osc.connect(filter).connect(g).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 1.5);
+}
+
+// Heartbeat thud for retention phase
+function playHeartbeat(bpm = 60) {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(55, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.3);
+  g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.4);
+}
+
+// Sub-bass drone for hold phase
+function playHoldDrone(duration = 120) {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  osc.type = 'sine';
+  osc.frequency.value = 40;
+  filter.type = 'lowpass';
+  filter.frequency.value = 80;
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 2);
+  osc.connect(filter).connect(g).connect(audioCtx.destination);
+  osc.start();
+  return { osc, gain: g, stop() {
+    g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.5);
+    osc.stop(audioCtx.currentTime + 2);
+  }};
+}
+
+// Rising tone for recovery inhale
+function playRise() {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 1.5);
+  g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.8);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.8);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 2);
+}
+
+// Release chord — C major arpeggio
+function playRelease() {
+  [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = audioCtx.currentTime + i * 0.2;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.08, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 1.5);
+  });
+}
+
+// Impact sound for tap-to-breathe
+function playImpact() {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.5);
+  g.gain.setValueAtTime(0.25, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+  osc.connect(g).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.5);
+}
+
+// ═══════════════════════════════════════════
+// PARTICLES (identical to UNSTUCK)
+// ═══════════════════════════════════════════
+const pCanvas = document.getElementById('particles');
+const pCtx = pCanvas.getContext('2d');
+let particles = [];
+
+function resizeParticles() {
+  pCanvas.width = window.innerWidth;
+  pCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeParticles);
+resizeParticles();
+
+function spawnParticles(n = 60) {
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: Math.random() * pCanvas.width,
+      y: Math.random() * pCanvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.5,
+      a: Math.random() * 0.15 + 0.03
+    });
+  }
+}
+
+let particleSpeed = 1;
+let particleColor = '255,255,255';
+
+function animateParticles() {
+  pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles.forEach(p => {
+    p.x += p.vx * particleSpeed;
+    p.y += p.vy * particleSpeed;
+    if (p.x < 0) p.x = pCanvas.width;
+    if (p.x > pCanvas.width) p.x = 0;
+    if (p.y < 0) p.y = pCanvas.height;
+    if (p.y > pCanvas.height) p.y = 0;
+    pCtx.beginPath();
+    pCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    pCtx.fillStyle = `rgba(${particleColor},${p.a})`;
+    pCtx.fill();
+  });
+  requestAnimationFrame(animateParticles);
+}
+spawnParticles();
+animateParticles();
+
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+const $ = id => document.getElementById(id);
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}`;
+}
+
+function setRingState(state) {
+  const rings = document.querySelectorAll('.ring');
+  rings.forEach(r => {
+    r.classList.remove('inhale', 'exhale', 'hold', 'bloom', 'bloom-hold');
+    if (state) r.classList.add(state);
+  });
+}
+
+function setRingSpeed(seconds) {
+  const rings = document.querySelectorAll('.ring');
+  rings.forEach(r => {
+    r.style.transitionDuration = `${seconds}s`;
+  });
+}
+
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const TOTAL_ROUNDS = 3;
+const BREATHS_PER_ROUND = 30;
+const RECOVERY_HOLD_SECONDS = 15;
+
+// Breath timing: starts slower, accelerates
+function getBreathTiming(breathNum) {
+  // Progress 0→1 over 30 breaths
+  const progress = breathNum / BREATHS_PER_ROUND;
+  // Inhale: 2.0s → 1.2s
+  const inhale = 2000 - progress * 800;
+  // Exhale: 1.5s → 0.8s
+  const exhale = 1500 - progress * 700;
+  return { inhale, exhale };
+}
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let holdTimes = [];
+let currentRound = 0;
+
+// ═══════════════════════════════════════════
+// PHASE: POWER BREATHE
+// ═══════════════════════════════════════════
+async function phasePowerBreathe(round) {
+  const counter = $('breath-counter');
+  const cue = $('breath-cue');
+  const bgPulse = $('bg-pulse');
+
+  counter.style.opacity = '1';
+  cue.style.opacity = '1';
+  bgPulse.style.opacity = '1';
+
+  // Start drone
+  const droneDuration = 90; // long enough for all breaths
+  playDrone(55, droneDuration, 0.12);
+  setTimeout(() => playDrone(82.5, droneDuration - 2, 0.08), 1000);
+
+  for (let i = 0; i < BREATHS_PER_ROUND; i++) {
+    const remaining = BREATHS_PER_ROUND - i;
+    const timing = getBreathTiming(i);
+    const progress = i / BREATHS_PER_ROUND;
+
+    counter.textContent = remaining;
+    // Counter brightens as intensity builds
+    counter.style.color = `rgba(255,255,255,${0.12 + progress * 0.2})`;
+
+    // Speed up ring transitions to match breath pace
+    setRingSpeed(timing.inhale / 1000);
+
+    // Inhale
+    cue.textContent = 'In';
+    setRingState('inhale');
+    playBreathPulse(true);
+    particleSpeed = 1 + progress * 2;
+
+    await sleep(timing.inhale);
+
+    // Exhale
+    setRingSpeed(timing.exhale / 1000);
+    cue.textContent = 'Out';
+    setRingState('exhale');
+    playBreathPulse(false);
+
+    await sleep(timing.exhale);
+  }
+
+  // Final exhale — empty lungs
+  counter.textContent = '';
+  cue.textContent = 'Let it all out';
+  setRingSpeed(3);
+  setRingState('exhale');
+  await sleep(2000);
+
+  cue.style.opacity = '0';
+  counter.style.opacity = '0';
+  particleSpeed = 0.5;
+}
+
+// ═══════════════════════════════════════════
+// PHASE: RETENTION (Hold after exhale)
+// ═══════════════════════════════════════════
+async function phaseRetention(round) {
+  const holdTimer = $('hold-timer');
+  const cue = $('breath-cue');
+  const tapZone = $('tap-zone');
+
+  // Rings go to subtle hold state
+  setRingSpeed(2);
+  setRingState('hold');
+
+  // Show hold UI
+  holdTimer.style.opacity = '1';
+  holdTimer.style.color = 'rgba(255,255,255,0.2)';
+  cue.textContent = 'Hold — tap when you need to breathe';
+  cue.style.opacity = '1';
+  tapZone.style.display = 'block';
+  particleSpeed = 0.3;
+
+  // Start sub-bass hold drone
+  const holdDrone = playHoldDrone();
+
+  // Heartbeat
+  let heartbeatInterval = setInterval(() => {
+    playHeartbeat();
+    // Subtle ring pulse on heartbeat
+    const hb = $('heartbeat');
+    hb.style.borderColor = 'rgba(255,255,255,0.06)';
+    setTimeout(() => hb.style.borderColor = 'rgba(255,255,255,0)', 200);
+  }, 1000);
+
+  // Timer counts up
+  let seconds = 0;
+  const timerInterval = setInterval(() => {
+    seconds++;
+    holdTimer.textContent = formatTime(seconds);
+    // Timer gradually brightens
+    const brightness = Math.min(0.4, 0.2 + seconds * 0.003);
+    holdTimer.style.color = `rgba(255,255,255,${brightness})`;
+  }, 1000);
+  holdTimer.textContent = '0';
+
+  // Wait for tap
+  await new Promise(resolve => {
+    tapZone.addEventListener('click', () => {
+      playImpact();
+      resolve();
+    }, { once: true });
+  });
+
+  clearInterval(timerInterval);
+  clearInterval(heartbeatInterval);
+  holdDrone.stop();
+
+  holdTimes.push(seconds);
+
+  // Flash on release
+  const flash = $('flash');
+  flash.style.opacity = '0.3';
+  setTimeout(() => flash.style.opacity = '0', 150);
+
+  tapZone.style.display = 'none';
+  holdTimer.style.opacity = '0';
+  cue.style.opacity = '0';
+}
+
+// ═══════════════════════════════════════════
+// PHASE: RECOVERY BREATH
+// ═══════════════════════════════════════════
+async function phaseRecovery(round) {
+  const holdTimer = $('hold-timer');
+  const cue = $('breath-cue');
+
+  // Big inhale — rings bloom with warm color
+  cue.textContent = 'Deep breath in — hold';
+  cue.style.opacity = '1';
+  setRingSpeed(2);
+  setRingState('bloom');
+  playRise();
+  particleSpeed = 3;
+  particleColor = '255,220,150';
+
+  await sleep(2500);
+
+  // Hold recovery breath — 15 second countdown
+  setRingState('bloom-hold');
+  holdTimer.style.opacity = '1';
+  holdTimer.style.color = 'rgba(255,200,100,0.3)';
+  particleSpeed = 1;
+
+  for (let s = RECOVERY_HOLD_SECONDS; s >= 1; s--) {
+    holdTimer.textContent = s;
+    await sleep(1000);
+  }
+
+  // Release
+  cue.textContent = 'Let go';
+  setRingSpeed(3);
+  setRingState('exhale');
+  playRelease();
+  particleSpeed = 0.5;
+  particleColor = '255,255,255';
+  holdTimer.style.opacity = '0';
+
+  await sleep(3000);
+  cue.style.opacity = '0';
+}
+
+// ═══════════════════════════════════════════
+// ROUND TRANSITION
+// ═══════════════════════════════════════════
+async function showRoundTransition(round) {
+  const prompt = $('prompt');
+  if (round < TOTAL_ROUNDS) {
+    prompt.textContent = `Round ${round + 1}`;
+    prompt.classList.add('visible');
+    await sleep(2000);
+    prompt.classList.remove('visible');
+    await sleep(800);
+  }
+}
+
+// ═══════════════════════════════════════════
+// COMPLETION
+// ═══════════════════════════════════════════
+async function showCompletion() {
+  const comp = $('complete');
+  const h2 = comp.querySelector('h2');
+  const stats = comp.querySelector('.stats');
+
+  // Build stats
+  const totalHold = holdTimes.reduce((a, b) => a + b, 0);
+  const longestHold = Math.max(...holdTimes);
+  stats.innerHTML = holdTimes.map((t, i) =>
+    `Round ${i + 1} hold: ${formatTime(t)}`
+  ).join('<br>') + `<br><br>Total retention: ${formatTime(totalHold)}<br>Longest hold: ${formatTime(longestHold)}`;
+
+  comp.classList.add('active');
+  await sleep(500);
+  h2.style.opacity = '1';
+  playRelease();
+  await sleep(1000);
+  stats.style.opacity = '1';
+
+  particleSpeed = 0.3;
+}
+
+// ═══════════════════════════════════════════
+// MAIN FLOW
+// ═══════════════════════════════════════════
+async function runSession() {
+  const roundIndicator = $('round-indicator');
+
+  for (let round = 0; round < TOTAL_ROUNDS; round++) {
+    currentRound = round;
+
+    // Round indicator
+    roundIndicator.textContent = `Round ${round + 1} of ${TOTAL_ROUNDS}`;
+    roundIndicator.style.opacity = '1';
+
+    // Transition text between rounds
+    await showRoundTransition(round);
+
+    // 1. Power breathe
+    await phasePowerBreathe(round);
+    await sleep(500);
+
+    // 2. Retention hold
+    await phaseRetention(round);
+    await sleep(500);
+
+    // 3. Recovery breath
+    await phaseRecovery(round);
+
+    roundIndicator.style.opacity = '0';
+    await sleep(1000);
+  }
+
+  // Done
+  $('scene').style.opacity = '0.3';
+  roundIndicator.style.opacity = '0';
+  await showCompletion();
+}
+
+// ═══════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════
+$('start-screen').addEventListener('click', async () => {
+  initAudio();
+  $('start-screen').style.transition = 'opacity 1s';
+  $('start-screen').style.opacity = '0';
+  await sleep(1000);
+  $('start-screen').style.display = 'none';
+  $('bg-pulse').style.opacity = '1';
+
+  runSession();
+}, { once: true });
+</script>
+</body>
+</html>
