@@ -3,7 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>BREATHE</title>
+<title>BREATHE — nomandre</title>
+
+<!-- Open Graph -->
+<meta property="og:title" content="BREATHE">
+<meta property="og:description" content="90 seconds. No app. No signup. Just open it and breathe.">
+<meta property="og:image" content="https://raw.githubusercontent.com/elatedpixel/unstuck/main/breath/og-image.png">
+<meta property="og:url" content="https://nomandre.com/breathe">
+<meta property="og:type" content="website">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BREATHE">
+<meta name="twitter:description" content="90 seconds. No app. No signup. Just open it and breathe.">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/elatedpixel/unstuck/main/breath/og-image.png">
+
+<meta name="description" content="90 seconds. No app. No signup. Just open it and breathe.">
+<meta name="theme-color" content="#000000">
+
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -755,12 +772,11 @@ async function phasePowerBreathe(round) {
     await sleep(timing.exhale);
   }
 
-  // Final exhale — empty lungs + distinct hold signal
+  // Final exhale — empty lungs
   counter.textContent = '';
   cue.textContent = 'Let it all out';
   setRingSpeed(3);
   setRingState('exhale');
-  playHoldSignal();
   await sleep(2000);
 
   cue.style.opacity = '0';
