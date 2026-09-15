@@ -8,7 +8,7 @@
 <!-- Open Graph -->
 <meta property="og:title" content="BREATHE">
 <meta property="og:description" content="90 seconds. No app. No signup. Just open it and breathe.">
-<meta property="og:image" content="https://raw.githubusercontent.com/elatedpixel/unstuck/main/breath/og-image.png">
+<meta property="og:image" content="https://nomandre.com/breathe/og-image.png">
 <meta property="og:url" content="https://nomandre.com/breathe">
 <meta property="og:type" content="website">
 
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="BREATHE">
 <meta name="twitter:description" content="90 seconds. No app. No signup. Just open it and breathe.">
-<meta name="twitter:image" content="https://raw.githubusercontent.com/elatedpixel/unstuck/main/breath/og-image.png">
+<meta name="twitter:image" content="https://nomandre.com/breathe/og-image.png">
 
 <meta name="description" content="90 seconds. No app. No signup. Just open it and breathe.">
 <meta name="theme-color" content="#000000">
@@ -238,7 +238,61 @@
     letter-spacing: 4px;
     text-transform: uppercase;
     color: rgba(255,255,255,0.2);
+    margin-bottom: 32px;
+  }
+
+  /* Round selector */
+  .round-selector {
+    display: flex;
+    align-items: center;
+    gap: 24px;
     margin-bottom: 40px;
+  }
+  .round-selector .round-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.15);
+    margin-bottom: 8px;
+    text-align: center;
+    width: 100%;
+  }
+  .round-selector-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .round-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.3);
+    font-family: 'System', sans-serif;
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.3s, color 0.3s;
+    border-radius: 0;
+    line-height: 1;
+    padding: 0;
+  }
+  .round-btn:hover {
+    border-color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.6);
+  }
+  .round-btn:active {
+    border-color: rgba(196,149,106,0.5);
+    color: rgba(196,149,106,0.8);
+  }
+  .round-count {
+    font-size: 28px;
+    font-weight: 200;
+    color: rgba(255,255,255,0.4);
+    min-width: 24px;
+    text-align: center;
   }
 
   #start-screen .tap-start {
@@ -362,6 +416,13 @@
     <span>headphones recommended</span>
   </div>
   <div class="mouth-hint">breathe through your mouth</div>
+  <div class="round-selector">
+    <div class="round-selector-inner">
+      <button class="round-btn" id="rounds-minus" onclick="event.stopPropagation(); adjustRounds(-1)">−</button>
+      <span class="round-count" id="round-count">3</span>
+      <button class="round-btn" id="rounds-plus" onclick="event.stopPropagation(); adjustRounds(1)">+</button>
+    </div>
+  </div>
   <p class="tap-start">Tap to begin</p>
   <div class="disclaimer">
     Not medical advice. Do not practice near water, while driving, or standing.
@@ -696,11 +757,18 @@ function setRingSpeed(seconds) {
 // ═══════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════
-const TOTAL_ROUNDS = 3;
 const BREATHS_PER_ROUND = 30;
 const RECOVERY_HOLD_SECONDS = 15;
 const MAX_HOLD_SECONDS = 240; // 4 minute safety cap
 const HOLD_WARNING_AT = 210; // Warning tone at 3:30
+const MIN_ROUNDS = 1;
+const MAX_ROUNDS = 5;
+let TOTAL_ROUNDS = 3;
+
+function adjustRounds(delta) {
+  TOTAL_ROUNDS = Math.max(MIN_ROUNDS, Math.min(MAX_ROUNDS, TOTAL_ROUNDS + delta));
+  $('round-count').textContent = TOTAL_ROUNDS;
+}
 
 // Breath timing: starts slower, accelerates
 function getBreathTiming(breathNum) {
